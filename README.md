@@ -44,8 +44,6 @@ Você pode ajustar o comportamento da simulação diretamente no código fonte:
 ## 🖼️ Interface
 A interface gráfica mostra em tempo real o status do canal (livre ou ocupado) e os eventos de cada transmissor. 
 
-![screenshot](Tela de simulação.png)
-
 ## 📊 Exemplo de gráfico de estatísticas gerado
 - Sucessos x Tentativas
 - Eficiência (%)
