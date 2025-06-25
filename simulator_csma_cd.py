@@ -1,32 +1,36 @@
+# Importação de bibliotecas
+import tkinter as tk  # Interface gráfica
+import threading       # Execução concorrente (threads simultâneas)
+import time            # Controle de tempo
+import random          # Geração de números aleatórios
+import matplotlib.pyplot as plt  # Gráficos estatísticos
 
-import tkinter as tk
-import threading
-import time
-import random
-import matplotlib.pyplot as plt
-
-
+# Classe principal do simulador com interface gráfica
 class CSMACDSimulatorGUI:
     def __init__(self, root):
+        # Inicialização da janela principal
         self.root = root
         self.root.title("Simulador CSMA/CD - IEEE 802.3")
 
+        # Variáveis de controle da simulação
         self.status_var = tk.StringVar(value="Canal: Livre")
         self.running = False
-        self.packet_id = 0
-        self.stats = {}
-        self.velocidade_simulacao = tk.DoubleVar(value=1.0)
+        self.packet_id = 0  # Contador de pacotes
+        self.stats = {}  # Estatísticas por transmissor
+        self.velocidade_simulacao = tk.DoubleVar(value=1.0)  # Velocidade ajustável
 
-        self.transmitting_now = []
-        self.transmitting_lock = threading.Lock()
+        self.transmitting_now = []  # Lista de transmissores ativos
+        self.transmitting_lock = threading.Lock()  # Controle de concorrência
 
+        # Criação do canvas para desenhar transmissores
         self.canvas = tk.Canvas(root, width=1200, height=300, bg='white')
         self.canvas.pack(pady=10)
 
         self.transmitters = []
         self.rects = []
-        self.num_transmitters = 4
+        self.num_transmitters = 4  # Número de transmissores simulados
 
+        # Criação visual de cada transmissor
         for i in range(self.num_transmitters):
             x0 = 30 + i * 110
             rect = self.canvas.create_rectangle(x0, 30, x0 + 80, 100, fill="gray")
@@ -34,6 +38,7 @@ class CSMACDSimulatorGUI:
             self.rects.append(rect)
             self.stats[f"T{i + 1}"] = {"sucesso": 0, "colisoes": 0, "tentativas": 0}
 
+        # Elementos da interface
         self.status_label = tk.Label(root, textvariable=self.status_var, font=("Arial", 14))
         self.status_label.pack()
 
@@ -52,28 +57,33 @@ class CSMACDSimulatorGUI:
         self.save_log_btn = tk.Button(root, text="Salvar Log", command=self.salvar_log)
         self.save_log_btn.pack(pady=5)
 
+        # Controle de velocidade
         tk.Label(root, text="Velocidade da Simulação (1.0 = normal):").pack()
         self.velocidade_slider = tk.Scale(root, from_=0.1, to=3.0, resolution=0.1,
                                           orient=tk.HORIZONTAL, variable=self.velocidade_simulacao)
         self.velocidade_slider.pack(pady=5)
 
+    # Função para registrar mensagens no log da interface
     def log(self, msg):
         self.log_text.insert(tk.END, msg + "\n")
         self.log_text.see(tk.END)
 
+    # Inicia a simulação com threads independentes para cada transmissor
     def iniciar_simulacao(self):
         if not self.running:
             self.running = True
             for i in range(self.num_transmitters):
                 threading.Thread(target=self.simular_transmissao, args=(f"T{i + 1}", self.rects[i]), daemon=True).start()
 
+    # Para a simulação
     def parar_simulacao(self):
         self.running = False
         self.status_var.set("Simulação parada.")
         self.log("==== Simulação Finalizada ====")
 
+    # Simula o comportamento de um transmissor CSMA/CD
     def simular_transmissao(self, nome, rect_id):
-        k = 0
+        k = 0  # Tentativas de backoff
         slot_time = 0.2
 
         while self.running:
@@ -81,7 +91,7 @@ class CSMACDSimulatorGUI:
             tempo_espera = random.uniform(0.8, 1.5) * v
             time.sleep(tempo_espera)
 
-            self.canvas.itemconfig(rect_id, fill="yellow")
+            self.canvas.itemconfig(rect_id, fill="yellow")  # Escutando canal
             self.status_var.set(f"{nome} escutando o canal...")
             self.log(f"{nome}: escutando canal após {tempo_espera:.2f}s.")
 
@@ -93,7 +103,7 @@ class CSMACDSimulatorGUI:
                 self.canvas.itemconfig(rect_id, fill="gray")
                 continue
 
-            time.sleep(0.02 * v)
+            time.sleep(0.02 * v)  # Atraso antes da transmissão
 
             with self.transmitting_lock:
                 self.transmitting_now.append(nome)
@@ -103,10 +113,10 @@ class CSMACDSimulatorGUI:
             with self.transmitting_lock:
                 num_transmitindo = len(self.transmitting_now)
 
-            self.stats[nome]["tentativas"] += 1  # ✅ Agora toda tentativa é registrada
+            self.stats[nome]["tentativas"] += 1
 
             if num_transmitindo > 1:
-                # COLISÃO
+                # Colisão detectada
                 self.stats[nome]["colisoes"] += 1
                 self.status_var.set("COLISÃO DETECTADA!")
                 self.canvas.itemconfig(rect_id, fill="red")
@@ -147,8 +157,9 @@ class CSMACDSimulatorGUI:
 
             self.canvas.itemconfig(rect_id, fill="gray")
             self.status_var.set("Canal: Livre")
-            k = 0
+            k = 0  # Reinicia o backoff
 
+    # Exibe as estatísticas finais e gera os gráficos
     def mostrar_estatisticas(self):
         self.log("\n=== ESTATÍSTICAS FINAIS ===")
         transmissores = []
@@ -184,6 +195,7 @@ class CSMACDSimulatorGUI:
         self.log(f"Total de Pacotes com Sucesso: {total_sucessos}")
         self.log(f"Eficiência do Canal: {eficiencia:.2f}%")
 
+        # Geração de gráficos
         plt.figure(figsize=(12, 5))
 
         plt.subplot(1, 3, 1)
@@ -201,6 +213,7 @@ class CSMACDSimulatorGUI:
         plt.tight_layout()
         plt.show()
 
+    # Salva o log em um arquivo de texto
     def salvar_log(self):
         conteudo = self.log_text.get("1.0", tk.END).strip()
         if conteudo:
@@ -210,7 +223,7 @@ class CSMACDSimulatorGUI:
         else:
             self.log("Nenhum log para salvar.")
 
-
+# Execução principal
 if __name__ == "__main__":
     root = tk.Tk()
     app = CSMACDSimulatorGUI(root)
